@@ -1,0 +1,76 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env
+.env.*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+architecture.html
+
+# 작업 노트 — 공개 대상 아님 (블로그 원재료)
+#   디렉터리째 제외하면 하위 예외(!)가 안 먹으므로 /docs/* 로 쓴다
+/docs/*
+# 단, 실험 기록은 공개한다 — 코드의 상수들이 근거로 참조하는 문서다
+!/docs/experiments/
+
+# Claude 메모리 / 로컬 설정 — 공개 대상 아님
+.claude/
+
+# 임베딩 캐시 — 21MB 라 제외. API 호출로 재생성 가능하다.
+notebooks/data/*.pkl
+#
+# ★ judge_cache / rerank_cache 는 **커밋한다.** 크기가 작고(20KB 안팎),
+#   판정 캐시는 Gemini 235회(약 $0.15 · 12분)를 들여 만든 것이라
+#   잃으면 다시 돈을 써야 한다. 리랭커 캐시도 CPU 4분치다.
+
+# 파이썬 캐시
+__pycache__/
+*.pyc
+
+# 파이썬 빌드 산출물 — pip install -e 가 만든다
+*.egg-info/
+build/
+dist/
+
+# 이 프로젝트 추가 — 이미지·데이터셋·DB 는 저장소에 넣지 않는다
+#   경로를 notebooks/ 아래로 맞춘다 (실제 구조)
+notebooks/data/       # 직접 찍은 사진 · 공개 데이터셋 원본 · 호출 캐시
+!notebooks/data/.gitkeep
+*.sqlite3             # 하루 누적 기록
+*.db
+*.pkl                 # 모델 호출 캐시 (Groq 가 4장/분이라 캐시가 필수인데, 용량이 크다)
