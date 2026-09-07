@@ -123,10 +123,30 @@ cp .env.example .env      # 키 두 개를 채웁니다
 
 ## 데이터
 
-| | 라이선스 | 쓰임 |
-|---|---|---|
-| SROIE | MIT | 추출 정확도 · 교차검증 전제 검증 |
-| CORD | CC BY-SA 4.0 | 품목이 있어 합계 검산 검출력 측정 |
+정확도 측정에는 **CORD** 를 씁니다. 정답 라벨이 있고, **라이선스가 원본에 명시**돼 있으며,
+품목이 있어 합계 검산까지 한 데이터로 잴 수 있는 것이 이것뿐이었습니다.
+
+> **CORD: A Consolidated Receipt Dataset for Post-OCR Parsing**
+> Seunghyun Park, Seung Shin, Bado Lee, Junyeop Lee, Jaeheung Surh, Minjoon Seo, Hwalsuk Lee
+> (NAVER CLOVA) · Document Intelligence Workshop at NeurIPS, 2019
+> 원본 <https://github.com/clovaai/cord> · 배포 <https://huggingface.co/datasets/naver-clova-ix/cord-v2>
+> 라이선스 **[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)**
+>
+> *변경 사항:* 이 저장소는 원본 이미지·라벨을 **포함하지 않습니다.** 실행 시 내려받아
+> 평가에 필요한 필드만 발췌하고, 비교를 위해 값을 정규화합니다(금액→숫자, 날짜→ISO).
+
+### 쓰지 않기로 한 것
+
+| | 사유 |
+|---|---|
+| FUNSD | 비상업 학술 전용. 이 저장소는 공개물이라 충돌 여지가 있습니다 |
+| SROIE | **라이선스 미표기.** 아래 참고 |
+
+SROIE 는 원래 "MIT 라서 가장 안전한 선택지"로 채택돼 있었는데, **대조해보니 틀렸습니다.**
+그 MIT 는 [대회 참가팀 코드 저장소](https://github.com/zzzDavid/ICDAR-2019-SROIE)의 라이선스이고
+(그 저장소는 데이터를 담고 있지도 않습니다), 공식 RRC 페이지·대회 논문·HuggingFace 미러
+어디에도 데이터셋 자체의 라이선스 표기가 없습니다. 금지된 것이 아니라 **알 수 없는 것**이라,
+근거를 댈 수 없는 것은 쓰지 않기로 했습니다.
 
 **정확도 측정은 공개 데이터셋으로만 합니다.** 영양성분표는 직접 촬영한 소량이라
 검산 규칙의 동작 확인용이고, 정확도 근거로 쓰지 않습니다.
@@ -136,4 +156,5 @@ cp .env.example .env      # 키 두 개를 채웁니다
 
 ## 라이선스
 
-MIT
+MIT — **이 저장소의 코드**에 적용됩니다. `LICENSE` 참고.
+실험에 쓰는 공개 데이터셋은 위 "데이터" 절의 조건을 따르며, 이 저장소에 포함되지 않습니다.
