@@ -21,7 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio", "ruff"]
 # 실험용 — 노트북·데이터셋. 서빙에는 필요 없다
-lab = ["jupyter", "nbconvert", "ipykernel", "datasets", "pandas", "numpy", "matplotlib"]
+lab = ["jupyter", "nbconvert", "ipykernel", "datasets", "pandas", "numpy", "matplotlib", "pytesseract"]
 # 로컬 오픈소스 VLM (2층). 기본 경로에 두지 않는다 — md-rag-chatbot 에서 겪은 함정
 local = ["mlx-vlm"]
 
