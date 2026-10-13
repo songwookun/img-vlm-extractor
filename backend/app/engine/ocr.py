@@ -7,7 +7,7 @@ from PIL import Image
 Token = dict          # {"text": str, "conf": float, "bbox": (x1, y1, x2, y2)}
 BBox = tuple[int, int, int, int]
 
-PSMS = (3, 6)         # 깨끗하면 3, 흐리면 6 이 낫다. 이미지 상태를 모르므로 둘 다 읽는다
+PSMS = (3, 6)         # 깨끗하면 3, 흐리면 6 이 낫다
 LANG = "kor+eng"
 
 
@@ -19,6 +19,13 @@ def read_tokens(img: Image.Image, psm: int = 3, lang: str = LANG) -> list[Token]
             x, y, w, h = d["left"][i], d["top"][i], d["width"][i], d["height"][i]
             out.append({"text": text, "conf": float(d["conf"][i]), "bbox": (x, y, x + w, y + h)})
     return out
+
+
+def check_ready(lang: str = LANG) -> None:
+    """tesseract 와 언어 데이터가 있는가. VLM 호출 전에 확인한다."""
+    missing = set(lang.split("+")) - set(pytesseract.get_languages())
+    if missing:
+        raise RuntimeError(f"tesseract 언어 데이터 없음: {', '.join(sorted(missing))}")
 
 
 def read_all(img: Image.Image) -> list[list[Token]]:
@@ -44,10 +51,7 @@ def lines(tokens: list[Token], y_tol: int = 8) -> list[list[Token]]:
 
 
 def ground(value: str | None, kind: str, token_sets: list[list[Token]]) -> BBox | None:
-    """값이 OCR 토큰(어느 읽기 모드든)에 있으면 그 위치, 없으면 None.
-
-    글자 단위로 쪼개진 토큰을 이어 붙여 찾는다. 이어 붙일 최대 토큰 수는 값의 글자 수다.
-    """
+    """값이 OCR 토큰에 있으면 그 위치(쪼개진 토큰은 이어 붙여 찾는다), 없으면 None."""
     target = norm(value or "", kind)
     if not target:
         return None
@@ -64,7 +68,7 @@ def ground(value: str | None, kind: str, token_sets: list[list[Token]]) -> BBox 
 
 
 def ground_by_mode(value: str | None, kind: str, token_sets: list[list[Token]]) -> tuple[BBox | None, str]:
-    """읽기 모드마다 따로 찾는다. 한쪽에서만 찾히면 "모드 불일치": OCR 끼리도 갈린 애매한 글자다."""
+    """읽기 모드마다 따로 찾는다. 한쪽에서만 찾히면 "모드 불일치"."""
     found = [b for b in (ground(value, kind, [tokens]) for tokens in token_sets) if b]
     if not found:
         return None, "없음"

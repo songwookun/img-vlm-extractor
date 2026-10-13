@@ -1,7 +1,9 @@
 """VLM: 전체 추출(V0)과 합계·날짜 크롭 재독(V3)."""
 import base64
+import hashlib
 import io
 import json
+import math
 import re
 import time
 from collections.abc import Callable
@@ -43,7 +45,34 @@ _QTY_UNIT = re.compile(r"\s*([\d.,]+)\s*([가-힣A-Za-z]+)\s*")
 
 
 class DailyLimit(Exception):
-    """하루 한도. 기다려도 풀리지 않으므로 재시도하지 않는다."""
+    """하루 한도. 재시도하지 않는다."""
+
+
+class VlmError(RuntimeError):
+    """재시도를 다 쓴 일시적 실패(5xx · 타임아웃)."""
+
+
+class VlmRejected(VlmError):
+    """이 요청만 거부됨(400 · 413 · 422) — 이미지가 너무 크거나 형식이 맞지 않는다."""
+
+
+class VlmFatal(RuntimeError):
+    """어떤 요청이든 같은 실패(키 · 권한 · 주소)."""
+
+
+_MAX_WAIT = 600     # 이보다 긴 retry-after 는 사실상 하루 한도
+
+
+def _redact(text: str) -> str:
+    return re.sub(r"org_\w+", "org_***", text[:300])
+
+
+def _retry_after(r: httpx.Response, default: float = 15) -> float:
+    try:
+        wait = float(r.headers.get("retry-after", default))
+    except ValueError:              # HTTP-date 형식
+        return default
+    return wait if math.isfinite(wait) and wait >= 0 else default
 
 
 class GroqClient:
@@ -52,8 +81,9 @@ class GroqClient:
     def __init__(self, api_key: str = settings.groq_api_key, model: str = settings.groq_model,
                  tries: int = 6, timeout: float = 120):
         if not api_key:
-            raise RuntimeError("GROQ_API_KEY 가 없습니다. backend/.env 에 넣으세요.")
+            raise VlmFatal("GROQ_API_KEY 가 없습니다. backend/.env 에 넣으세요.")
         self.model, self.tries = model, tries
+        self.calls: list[dict] = []     # 성공한 호출의 프롬프트 해시 · 토큰 · 초
         self._http = httpx.Client(headers={"Authorization": f"Bearer {api_key}"}, timeout=timeout)
 
     def __call__(self, img: Image.Image, prompt: str, max_tokens: int) -> str:
@@ -66,23 +96,42 @@ class GroqClient:
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{_png_b64(img)}"}},
             ]}],
         }
+        last, wait = None, 0.0
         for attempt in range(self.tries):
-            r = self._http.post(self.URL, json=body)
+            if attempt:
+                time.sleep(min(wait, _MAX_WAIT))
+            start = time.monotonic()
+            try:
+                r = self._http.post(self.URL, json=body)
+            except httpx.TransportError as e:       # 타임아웃 · 연결 끊김
+                last, wait = e, 2 ** attempt
+                continue
             if r.status_code == 200:
-                return r.json()["choices"][0]["message"]["content"]
-            if r.status_code == 429 and "per day" in r.text:
-                raise DailyLimit(r.text[:300])
+                try:
+                    data = r.json()
+                    text = data["choices"][0]["message"]["content"] or ""
+                except (ValueError, KeyError, IndexError, TypeError):
+                    last, wait = VlmError(f"200 형식 이상 {_redact(r.text)}"), 2 ** attempt
+                    continue
+                self.calls.append({"prompt": hashlib.md5(prompt.encode()).hexdigest()[:8],
+                                   "tokens": (data.get("usage") or {}).get("total_tokens"),
+                                   "seconds": round(time.monotonic() - start, 2)})
+                return text
             if r.status_code == 429:
-                time.sleep(float(r.headers.get("retry-after", 15)))
+                wait = _retry_after(r)
+                if "per day" in r.text or wait > _MAX_WAIT:
+                    raise DailyLimit(_redact(r.text))
             elif r.status_code >= 500:
-                time.sleep(2 ** attempt)
+                wait = 2 ** attempt
+            elif r.status_code in (400, 413, 422):
+                raise VlmRejected(f"{r.status_code} {_redact(r.text)}")
             else:
-                raise RuntimeError(f"{r.status_code} {r.text[:300]}")
-        raise RuntimeError(f"재시도 {self.tries}회 초과")
+                raise VlmFatal(f"{r.status_code} {_redact(r.text)}")
+            last = VlmError(f"{r.status_code} {_redact(r.text)}")
+        raise VlmError(f"재시도 {self.tries}회 초과") from last
 
 
 def _png_b64(img: Image.Image) -> str:
-    # PNG(무손실): JPEG 면 전송 중 압축이 한 번 더 들어간다
     buf = io.BytesIO()
     img.save(buf, "PNG")
     return base64.b64encode(buf.getvalue()).decode()
@@ -123,10 +172,7 @@ def extract(img: Image.Image, chat: Chat) -> Fields | None:
 
 
 def crop_regions(x: Fields) -> dict[str, tuple[int, int, int, int]]:
-    """합계·날짜 칸의 양식 위치. 표 아래 경계는 VLM 이 읽은 품목 수로 정한다.
-
-    합계 영역을 아래로 150px 잡아 품목 수를 한 줄 틀려도 합계 줄이 남는다.
-    """
+    """합계·날짜 칸의 양식 위치. 합계 줄은 VLM 이 읽은 품목 수로 정한다(한 줄 틀려도 영역 안)."""
     top = _TABLE_TOP + _ROW_H * ((item_count(x) or _DEFAULT_ITEMS) + 1)
     return {"total": (540, top - 10, 860, top + 150), "date": _DATE_BOX}
 
@@ -137,7 +183,7 @@ def crop_up(img: Image.Image, box, scale: int = 2) -> Image.Image:
 
 
 def pad_to_ratio(img: Image.Image, min_h_ratio: float = 0.5) -> Image.Image:
-    """위아래 흰 여백으로 가로:세로 2:1 까지. 가늘고 긴 조각은 이미지 토큰이 두 배 넘게 든다."""
+    """위아래 흰 여백으로 가로:세로 2:1 까지. 가늘고 긴 조각은 토큰이 더 든다."""
     need_h = int(img.width * min_h_ratio)
     if img.height >= need_h:
         return img

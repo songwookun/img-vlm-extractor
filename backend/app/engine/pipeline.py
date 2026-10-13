@@ -32,7 +32,7 @@ class Result:
 
 def process(img: Image.Image, chat: vlm.Chat, read_ocr: ReadOcr = ocr.read_all,
             today: date | None = None) -> Result:
-    """VLM 호출 3번(전체 1 + 크롭 2). 하루 한도(vlm.DailyLimit)는 호출한 쪽으로 올린다."""
+    """VLM 호출 3번(전체 1 + 크롭 2). vlm.DailyLimit 은 호출한 쪽으로 올린다."""
     x = vlm.extract(img, chat)
     if x is None:
         return Result(None)

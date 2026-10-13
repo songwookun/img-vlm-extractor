@@ -1,6 +1,7 @@
 """사람용 출력: 검토 칸만 review.csv 로, 칸마다 빨간 박스 조각 이미지."""
 import csv
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -11,7 +12,7 @@ from app.engine.pipeline import Result
 
 COLUMNS = ["doc_id", "field", "value", "reasons", "bbox", "bbox_source", "crop_path"]
 
-# 견적서 양식 위치 (900×1273 기준). 품목·합계 줄은 VLM 이 읽은 품목 수로 계산한다
+# 견적서 양식 위치 (900×1273 기준)
 _HEADER_BOXES = {
     "doc_no": (150, 128, 300, 148), "date": (150, 158, 300, 178),
     "client": (60, 212, 460, 240), "supplier_brn": (570, 126, 760, 148),
@@ -49,8 +50,8 @@ def save_crop(img: Image.Image, bbox: BBox, path: Path, pad: int = 30) -> None:
     c.save(path)
 
 
-def write_review(docs: list[tuple[str, Image.Image, Result]], out_dir: Path) -> Path:
-    """검토 칸만 쓴다. 위치는 OCR 근거가 있으면 그 자리, 없으면 양식 위치."""
+def write_review(docs: Iterable[tuple[str, Image.Image | None, Result]], out_dir: Path) -> Path:
+    """검토 칸만 쓴다. 위치는 OCR 근거, 없으면 양식 위치. docs 는 제너레이터여도 된다."""
     crop_dir = out_dir / "crops"
     crop_dir.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -62,7 +63,7 @@ def write_review(docs: list[tuple[str, Image.Image, Result]], out_dir: Path) -> 
         for v in result.review:
             bbox, source = (v.bbox, "OCR") if v.bbox else (field_box(v.field, result.fields), "양식")
             crop = ""
-            if bbox:
+            if bbox and img is not None:
                 crop = str(crop_dir / f"{doc_id}_{v.field}.png")
                 save_crop(img, bbox, Path(crop))
             rows.append({"doc_id": doc_id, "field": v.field, "value": v.value or "", "reasons": " | ".join(v.reasons),

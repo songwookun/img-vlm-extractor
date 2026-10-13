@@ -1,8 +1,4 @@
-"""어떤 검산을 증거로 칠지 거른다.
-
-같은 VLM 이 읽은 값끼리 맞는 것은 증거가 아니다(잘못 읽은 단가로 금액을 계산해 쓴다).
-검산은 독립 출처로 확인된 합계(기준점)에서 내려올 때만 증거가 된다.
-"""
+"""검산은 독립 출처로 확인된 합계(기준점)에서 내려올 때만 증거로 친다."""
 from app.engine.checks import CheckResult, Fields, item_count, kor_to_int, parse_amount
 from app.engine.ocr import Token, ground
 

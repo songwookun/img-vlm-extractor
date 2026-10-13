@@ -36,10 +36,7 @@ def parsable(field: str, v: str) -> bool:
 
 
 def judge(x: Fields, checks: list[CheckResult], token_sets: list[list[Token]]) -> list[FieldVerdict]:
-    """신호 = 증거로 남은 검산 통과 + OCR 근거(두 읽기 모드가 일치할 때만).
-
-    실패한 검산은 그 검산에 걸린 칸만 검토로 보낸다. OCR 근거가 없는 것만으로는 빨간불이 아니다.
-    """
+    """신호 = 증거로 남은 검산 통과 + 두 읽기 모드가 일치하는 OCR 근거."""
     out = []
     for field, v in x.items():
         if not v:
